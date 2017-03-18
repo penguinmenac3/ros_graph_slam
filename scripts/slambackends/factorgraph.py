@@ -120,7 +120,7 @@ class FactorGraph(object):
 
         # Prepare helper variables
         pose = normalize_pose(pose)
-        idx = self.get_current_index()
+        idx = self.get_current_index() + 1
         global_pos = add_relative_pose(self.initial_poses[-1], pose)
 
         # Insert pose into initial_estimates
@@ -169,7 +169,7 @@ class FactorGraph(object):
 
         # Insert the node into the graph, if the id is valid.
         noise = gtsam.noiseModel_Diagonal.Sigmas(np.array([covariance[0][0], covariance[1][1], covariance[2][2]]))
-        self.graph_backend.add(gtsam.BetweenFactorPose2(from_id, to_id, Pose2(pose[0], pose[1], pose[2]), noise))
+        self.graph_backend.add(gtsam.BetweenFactorPose2(from_id, to_id, gtsam.Pose2(pose[0], pose[1], pose[2]), noise))
         if self.debug:
             self.graph_debug.edge(str(from_id), str(to_id), prefix + " {:4.2f}".format(pose[0]) + " {:4.2f}".format(pose[1]) + " {:4.2f}".format(pose[2]))
 
