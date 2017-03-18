@@ -1,0 +1,3 @@
+*.pyc
+deps
+scripts/slambackends/gtsam

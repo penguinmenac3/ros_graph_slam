@@ -1,0 +1,28 @@
+<launch>
+  <arg name="IS_TWISTSTAMPED" default="true" />
+  <param name="/stamped_vel" value="$(arg IS_TWISTSTAMPED)"/>
+
+  #### start the laser scan_matcher ##############################
+  <node ns="slam" pkg="laser_scan_matcher" type="laser_scan_matcher_node"
+    name="laser_scan_matcher_node">
+    <remap from="scan" to="laserscan" />
+    <remap from="pose_with_covariance_stamped" to="laserscan/scanmatch" />
+
+    <param name="do_compute_covariance" value="1"/>
+    <param name="publish_pose_with_covariance" value="false"/>
+    <param name="publish_pose_with_covariance_stamped" value="true"/>
+
+    <param name="fixed_frame" value="odom" />
+    <param name="base_frame" value="base_link" />
+    <param name="publish_tf" value="false" />
+    <param name="publish_pose_stamped" value="false" />
+    <param name="max_iterations" value="10" />
+  </node>
+
+  #### Start the graph slam backend ##############################
+  <node ns="slam" pkg="graph_slam_backend" type="graph_slam_node.py" name="graph_slam_backend"  output="screen" >
+    <remap from="scan" to="laserscan_filtered" />
+    <remap from="scanmatch" to="laserscan/scanmatch" />
+  </node>
+
+</launch>
