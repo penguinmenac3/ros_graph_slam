@@ -13,7 +13,7 @@ from nav_msgs.msg import Path
 from sensor_msgs.msg import NavSatFix, PointCloud2, LaserScan
 from slambackends.factorgraph import FactorGraph
 from geometry_msgs.msg import Point, Quaternion, Pose2D
-from graph_slam.msg import PoseNode, BetweenFactor, Path2D
+from graph_slam_backend.msg import PoseNode, BetweenFactor, Path2D
 
 def length_of_pose(pose):
     '''

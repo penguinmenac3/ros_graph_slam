@@ -52,6 +52,7 @@ add_message_files(
   FILES
   Path2D.msg
   BetweenFactor.msg
+  PoseNode.msg
 )
 
 ## Generate services in the 'srv' folder
