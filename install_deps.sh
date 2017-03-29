@@ -21,8 +21,8 @@ fi
 mkdir cython_build
 cd cython
 sudo pip install --upgrade pip
-sudo pip install numpy>=1.11.1
-sudo pip install Cython>=0.25.1
+sudo pip install numpy
+sudo pip install Cython
 sudo pip install eigency
 sudo pip install graphviz
 cd ..
