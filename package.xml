@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>graph_slam_backend</name>
+  <name>ros_graph_slam</name>
   <version>0.0.0</version>
   <description>The graph_slam_backend package</description>
 
@@ -19,7 +19,7 @@
   <!-- Url tags are optional, but multiple are allowed, one per tag -->
   <!-- Optional attribute type can be: website, bugtracker, or repository -->
   <!-- Example: -->
-  <!-- <url type="website">http://wiki.ros.org/graph_slam_backend</url> -->
+  <!-- <url type="website">http://wiki.ros.org/ros_graph_slam</url> -->
 
 
   <!-- Author tags are optional, multiple are allowed, one per tag -->
