@@ -20,7 +20,7 @@ if [ -d cython_build ] ; then
 fi
 mkdir cython_build
 cd cython
-sudo pip install --upgrade pip
+sudo pip install --upgrade pip setuptools
 sudo pip install numpy
 sudo pip install Cython
 sudo pip install eigency
