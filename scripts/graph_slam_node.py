@@ -43,19 +43,22 @@ class GraphSLAM(object):
     tf_br = tf.TransformBroadcaster()
     publish_tf = True
 
-    def __init__(self):
+    def __init__(self, map_path=None):
         self.lock = threading.Lock()
         self.map_lon = None
         self.map_lat = None
         self.last_scan = None
         self.last_laserscan = None
         self.last_idx = {}
-        self.last_pose = {}
-        self.last_pose["main_pose"] = [0, 0, 0]
-        self.graph = FactorGraph()
+        self.last_pose = {"main_pose": [0, 0, 0]}
+        self.graph = FactorGraph(map_path)
         self.last_ori = (0, 0, 0, 1)
         self.last_pos = (0, 0, 0)
         self.last_odom_pose = (0, 0, 0)
+        self.relocalization_required = False
+
+        if map_path is not None:
+            self.relocalization_required = True
 
         self.min_covariance_pose = [[0.01 * 0.01, 1e-8, 1e-8],
                             [1e-8, 0.01 * 0.01, 1e-8],
@@ -98,6 +101,12 @@ class GraphSLAM(object):
 
         for navsat in navsat.split(","):
             rospy.Subscriber(navsat, NavSatFix, self.navsat_callback)
+
+        if map_path is not None:
+            self.publish(self.graph.initial_poses, rospy.get_time())
+
+    def save(self, map_path):
+        self.graph.save(map_path)
 
     def publish(self, result, time_stamp):
         curPath = Path()
@@ -168,6 +177,8 @@ class GraphSLAM(object):
         self.last_laserscan = data
 
     def main_pose_callack(self, data):
+        if self.relocalization_required:
+            return
         quaternion = (data.pose.pose.orientation.x, data.pose.pose.orientation.y, data.pose.pose.orientation.z, data.pose.pose.orientation.w)
         pose = [0, 0, 0]
         pose[0] = data.pose.pose.position.x
@@ -204,13 +215,15 @@ class GraphSLAM(object):
         self.last_odom_pose = pose
 
         self.lock.acquire()
-        self.graph.add_main_relative_pose(rel_pose, covariance)
+        self.graph.append_relative_pose(rel_pose, covariance)
 
         result = self.graph.optimize()
         self.lock.release()
         self.publish(result, data.header.stamp)
 
     def pose_callack(self, topic, data):
+        if self.relocalization_required:
+            return
         current_idx = self.graph.get_current_index()
         if not topic in self.last_idx:
             self.last_idx[topic] = current_idx
@@ -244,7 +257,7 @@ class GraphSLAM(object):
                 covariance[row][col] = max(covariance[row][col], self.min_covariance_pose[row][col])
 
         self.lock.acquire()
-        self.graph.add_relative_pose(last_idx, current_idx, rel_pose, covariance)
+        self.graph.insert_relative_pose(last_idx, current_idx, rel_pose, covariance)
         self.lock.release()
 
     def between_callback(self, data):
@@ -264,7 +277,11 @@ class GraphSLAM(object):
                 covariance[row][col] = max(covariance[row][col], self.min_covariance_between_factor[row][col])
 
         self.lock.acquire()
-        self.graph.add_relative_pose(last_idx, current_idx, rel_pose, covariance)
+        if self.relocalization_required and current_idx == self.graph.get_current_index() + 1:
+            self.graph.append_relative_pose(rel_pose, covariance, last_idx)
+            self.relocalization_required = False
+        else:
+            self.graph.insert_relative_pose(last_idx, current_idx, rel_pose, covariance)
         result = self.graph.optimize(10)
         self.lock.release()
 
@@ -291,15 +308,31 @@ def main():
         The main function.
 
         It parses the arguments and sets up graph slam.
+
+        Usage: python graph_slam_node.py /path/to/load/map.npz /path/to/save/map.npz
+        or
+        Usage: python graph_slam_node.py /path/to/load/map.npz
+        or
+        Usage: python graph_slam_node.py None /path/to/save/map.npz
+        or
+        Usage: python graph_slam_node.py
     """
-    GraphSLAM()
+    map_input_path = None
+    if len(sys.argv) > 1:
+        map_input_path = sys.argv[1]
+        if map_input_path == "None":
+            map_input_path = None
+    slam = GraphSLAM(map_input_path)
 
     try:
         rospy.spin()
     except KeyboardInterrupt:
         print("Shutting down")
 
+    if len(sys.argv) > 2:
+        slam.save(sys.argv[2])
     sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
