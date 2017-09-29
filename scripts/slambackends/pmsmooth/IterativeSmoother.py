@@ -4,12 +4,14 @@ import collections
 
 
 class IterativeSmoother2D(object):
-    def __init__(self, max_steps=100, min_steps=10, gain=0.5, min_contribution_cutoff=0.01, min_error_cutoff=0.01):
+    def __init__(self, max_steps=100, min_steps=10, gain=0.01, min_contribution_cutoff=0.01, min_error_cutoff=0.01,
+                 debug=False):
         self.max_steps = max_steps
         self.min_steps = min_steps
         self.gain = gain
         self.min_contribution_cutoff = min_contribution_cutoff
         self.min_error_cutoff = min_error_cutoff
+        self.debug = debug
 
     def optimize(self, graph, start_node):
         i = 0
@@ -32,7 +34,13 @@ class IterativeSmoother2D(object):
 
                 # Update
                 delta = [self.gain * d for d in delta]
-                node.values = pose2d.add(node.values, delta)
+                if self.debug:
+                    print(delta)
+                    print(node.value)
+                node.value = pose2d.add(node.value, delta)
+                if self.debug:
+                    print(node.value)
+                    print("************")
 
                 # Add connected nodes for updates
                 visited.append(node)
@@ -58,9 +66,9 @@ class IterativeSmoother2D(object):
         for edge in graph.edges[node]:
             t = edge.neg_delta_error(node)
 
-            error[0] += t[0] / n
-            error[1] += t[1] / n
-            error[2] += math.cos(t[2])
-            error[3] += math.sin(t[2])
+            error[0] = error[0] + t[0] / n
+            error[1] = error[1] + t[1] / n
+            error[2] = error[2] + math.cos(t[2])
+            error[3] = error[3] + math.sin(t[2])
 
         return error[0], error[1], math.atan2(error[3], error[2])

@@ -89,7 +89,7 @@ class RelativePose2D(Edge):
         result = np.dot(term1, np.dot(term2, term3))
 
         # FIXME do I just need to invert the sign here for the negative gradient?
-        return -result[0], -result[1], -result[2]
+        return -result[0][0], -result[1][0], -result[2][0]
 
     def _loss(self, pose):
         """
