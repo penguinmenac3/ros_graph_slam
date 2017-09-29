@@ -1,95 +1,54 @@
 import math
 import numpy as np
 import pose2d
+from pose2d import tuple_to_numpy_pose as to_numpy
 
 
 class Edge(object):
-    def __init__(self, from_node, to_node):
+    def __init__(self, from_node, to_node, weight):
         self.from_node = from_node
         self.to_node = to_node
+        self.weight = weight
 
     def error(self, node):
         raise NotImplementedError("Not implemented. Base class must implement this.")
 
-    def neg_delta_error(self, node):
+    def estimate_pose(self, node):
+        """
+        Calculate the pose the node would have assuming it's neighbour was correct.
+        :param node: The node that should be estimated as a node object.
+        :return: The estimated position as np.array (3x1)
+        """
         raise NotImplementedError("Not implemented. Base class must implement this.")
-
-    def inverse(self):
-        return self
 
 
 class UnaryEdge(Edge):
-    def __init__(self, to_node):
-        super(UnaryEdge, self).__init__(None, to_node)
-
-
-class RelativePose2D(Edge):
-    def __init__(self, from_node, to_node, x, y, theta, covariance_matrix):
-        super(RelativePose2D, self).__init__(from_node, to_node)
-        self.rel_pose = (x, y, theta)
-        self.inv_covariance = np.linalg.inv(np.array(covariance_matrix))
+    def __init__(self, to_node, x, y, theta, covariance_matrix):
+        super(UnaryEdge, self).__init__(None, to_node, np.linalg.inv(np.array(covariance_matrix)))
+        self.abs_pose = (x, y, theta)
 
     def error(self, node):
         # Forward edge (normal direction)
         if node == self.to_node:
-            x_i = node.value
-            x_j = self.from_node.value
-
-        # Backward edge (backwards direction)
-        elif node == self.from_node:
-            x_i = self.to_node.value
-            x_j = node.value
+            x_i = to_numpy(node.value)
+            x_j = to_numpy((0, 0, 0))
 
         # Invalid case
         else:
             raise ValueError("The provided node is not part of the connection.")
 
         # relative pose points from j to i
-        r_ji = self.rel_pose
+        r_ji = to_numpy(self.abs_pose)
 
-        return self._loss(pose2d.subtract(pose2d.subtract(x_i, x_j), r_ji))
+        return self._loss(pose2d.calculate_relative_pose(pose2d.calculate_relative_pose(x_i, x_j), r_ji))
 
-    def neg_delta_error(self, node):
-        """
-        The negative derivative of the error with respect to the node.
-
-        Basically how to move the node to get the correct value.
-        With covariance = 0 this return will make a - b = r. Eg assume node is a and we want to know what to add to a
-        so that it is equal to b + r => a + return = b + r
-        With covariance = infinity this value would be zero.
-        :param node:
-        :return:
-        """
-        term1 = None
-        term2 = None
-        term3 = None# Forward edge (normal direction)
+    def estimate_pose(self, node):
         if node == self.to_node:
-            x_i = node.value
-            x_j = self.from_node.value
-
-            term1 = pose2d.delta_sub_a(x_i, x_j)
-
-        # Backward edge (backwards direction)
-        elif node == self.from_node:
-            x_i = self.to_node.value
-            x_j = node.value
-
-            term1 = pose2d.delta_sub_b(x_i, x_j)
+            return pose2d.calculate_next_pose(to_numpy((0, 0, 0)), to_numpy(self.abs_pose))
 
         # Invalid case
         else:
             raise ValueError("The provided node is not part of the connection.")
-
-        # relative pose points from j to i
-        r_ji = self.rel_pose
-
-        term2 = pose2d.delta_sub_a(pose2d.subtract(x_i, x_j), r_ji)
-        term3 = self._delta_loss(pose2d.subtract(pose2d.subtract(x_i, x_j), r_ji))
-
-        result = np.dot(term1, np.dot(term2, term3))
-
-        # FIXME do I just need to invert the sign here for the negative gradient?
-        return -result[0][0], -result[1][0], -result[2][0]
 
     def _loss(self, pose):
         """
@@ -97,21 +56,49 @@ class RelativePose2D(Edge):
         :param pose: Tuple containing 2d Pose (x, y, theta)
         :return: The norm as scalar value
         """
-        x, y, theta = pose
-        p = np.array([[x, y, theta]])
-        p_t = np.array([[x], [y], [theta]])
-        c = self.inv_covariance
+        t = np.dot(np.dot(pose.transpose(), self.weight), pose)
+        return t[0][0]
 
-        # pose * inv_covariance * pose^T
-        return np.dot(np.dot(p, c), p_t)
+class RelativePose2D(Edge):
+    def __init__(self, from_node, to_node, x, y, theta, covariance_matrix):
+        super(RelativePose2D, self).__init__(from_node, to_node, np.linalg.inv(np.array(covariance_matrix)))
+        self.rel_pose = (x, y, theta)
 
-    def _delta_loss(self, pose):
+    def error(self, node):
+        delta = None
+        # Forward edge (normal direction)
+        if node == self.to_node:
+            to_node = pose2d.calculate_next_pose(to_numpy(self.from_node.value), to_numpy(self.rel_pose))
+            delta = pose2d.calculate_relative_pose(to_node, to_numpy(self.to_node.value))
+
+        # Backward edge (backwards direction)
+        elif node == self.from_node:
+            from_node = pose2d.calculate_previous_pose(to_numpy(self.to_node.value), to_numpy(self.rel_pose))
+            delta = pose2d.calculate_relative_pose(from_node, to_numpy(self.from_node.value))
+
+        # Invalid case
+        else:
+            raise ValueError("The provided node is not part of the connection.")
+
+        return self._loss(delta)
+
+    def estimate_pose(self, node):
+        if node == self.to_node:
+            return pose2d.calculate_next_pose(to_numpy(self.from_node.value), to_numpy(self.rel_pose))
+
+        # Backward edge (backwards direction)
+        elif node == self.from_node:
+            return pose2d.calculate_previous_pose(to_numpy(self.to_node.value), to_numpy(self.rel_pose))
+
+        # Invalid case
+        else:
+            raise ValueError("The provided node is not part of the connection.")
+
+    def _loss(self, pose):
         """
-        Calculate the derivative of the loss with respect to the pose.
+        Calculates the loss of an offset pose pose
         :param pose: Tuple containing 2d Pose (x, y, theta)
-        :return: A numpy vector containing the derivative.
+        :return: The norm as scalar value
         """
-        x, y, theta = pose
-        c = self.inv_covariance
-        c_t = self.inv_covariance.transpose()
-        return np.dot((c + c_t), np.array([[x], [y], [theta]]))
+        t = np.dot(np.dot(pose.transpose(), self.weight), pose)
+        return t[0][0]
