@@ -5,7 +5,7 @@ A ros graph slam backend using gtsam python.
 
 This is a ros node to wrap the gtsam library into a ros node.
 
-![an image showing a map](images/Hallway.png)
+[![a video showing a maping proccess](https://img.youtube.com/vi/tWJzxa_WiCw/0.jpg)](https://www.youtube.com/watch?v=tWJzxa_WiCw)
 
 This node can be used in combination with a loop closure node.
 To solve the loop closure slam problem.
